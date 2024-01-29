@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Users = require("../models/users.model");
+const { addToBlacklist } = require("../config/tokenBlacklist");
 
 exports.login = async (req, res) => {
   try {
@@ -142,8 +143,14 @@ exports.logout = async (req, res) => {
         data: [],
       });
     }
+
     res.clearCookie("userData");
-    return res.json({ status: true, message: "Logout successful", data: [] });
+
+    // Add the token to the blacklist
+    const token = req.header("Authorization");
+    addToBlacklist(token);
+
+    return res.json({ status: true, message: "Logout successfully", data: [] });
   } catch (error) {
     console.error(error.message);
     res.status(500).json({ status: false, message: error.message, data: [] });

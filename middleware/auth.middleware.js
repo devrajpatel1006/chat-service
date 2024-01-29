@@ -1,17 +1,35 @@
 const jwt = require("jsonwebtoken");
+const {
+  addToBlacklist,
+  isTokenBlacklisted,
+} = require("../config/tokenBlacklist");
 
 const authMiddleware = (req, res, next) => {
   const token = req.header("Authorization");
-  const protectedRoutes = ["/api/users/add", "/api/users/edit","/api/users"];
+  const protectedRoutes = ["/api/users/add", "/api/users/edit", "/api/users"];
 
   // Check if token is present
   if (!token) {
     return res
       .status(401)
-      .json({ message: "Unauthorized - No token provided" });
+      .json({
+        status: false,
+        message: "Unauthorized - No token provided",
+        data: [],
+      });
   }
 
   try {
+    // Check if the token is in the blacklist
+    if (isTokenBlacklisted(token)) {
+      return res
+        .status(401)
+        .json({
+          status: false,
+          message: "Unauthorized - Token is blacklisted",
+          data: [],
+        });
+    }
     // Verify the token
     const decoded = jwt.verify(
       token.replace("Bearer ", ""),
@@ -27,8 +45,10 @@ const authMiddleware = (req, res, next) => {
         next();
       } else {
         return res.status(403).json({
+          status: false,
           message:
             "Forbidden - You do not have the permission to access this route",
+          data: []
         });
       }
     } else {
@@ -38,7 +58,7 @@ const authMiddleware = (req, res, next) => {
     }
   } catch (error) {
     console.error(error.message);
-    return res.status(401).json({ message: "Unauthorized - Invalid token" });
+    return res.status(401).json({ status:false,message: "Unauthorized - Invalid token", data: []});
   }
 };
 
