@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+  <link rel="stylesheet" type="text/css" href="/css/home.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css" type="text/css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.js"></script>
+  
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+ <script>
+   const userDataCookie = '<%- JSON.stringify(user) %>';
+   const userData = JSON.parse(userDataCookie);
+   const socket = io();
+
+    let Authorization = userData.token;
+    const userId = userData.id;
+    let globalGroupId = '';
+    document.addEventListener("DOMContentLoaded", function() {
+     
+      if (userData) {
+        document.getElementById('loggedInUserName').innerHTML = userData.username
+        // Fetch groups using the /api/groups/search endpoint
+        $.ajax({
+          url: "/api/groups/getUsersGroups/" + userId,
+          type: "GET",
+          beforeSend: function(xhr) {
+            xhr.setRequestHeader('Authorization', 'Bearer ' + Authorization);
+          },
+          success: function(response) {
+            let data = response.data;
+            // Handle the response and dynamically generate the left groups
+            const groupsContainer = $(".inbox_chat");
+            groupsContainer.empty(); // Clear existing groups
+
+
+            data.forEach(function(group) {
+              const groupElement = $("<div class='chat_list'></div>").click(function() {
+                getMessages(group.group_id._id);
+              });
+
+              groupElement.append(`
+                          <div class="chat_people">
+                            <div class="chat_img">
+                              <img src="https://ptetutorials.com/images/user-profile.png" alt="${group.group_id.group_name}" />
+                            </div>
+                            <div class="chat_ib">
+                              <h5>${group.group_id.group_name}</span></h5>
+                            </div>
+                          </div>
+                        `);
+
+              groupsContainer.append(groupElement);
+            });
+          },
+          error: function(error) {
+            console.error("Error fetching groups:", error);
+          },
+        });
+      }
+
+
+    });
+
+
+    function getMessages(groupId) {
+      socket.emit('joinRoom', groupId);
+      document.getElementById("typeMsgId").classList.remove("d-none");
+      document.getElementById("startChatId").classList.add("d-none");
+      
+      globalGroupId = groupId;
+      const userDataCookie = '<%- JSON.stringify(user) %>';
+      const userData = JSON.parse(userDataCookie);
+      const userId = userData.id;
+      $.ajax({
+        url: "/api/chat/getGroupMessages/" + groupId,
+        type: "POST",
+        data: {userId},
+        beforeSend: function(xhr) {
+          xhr.setRequestHeader('Authorization', 'Bearer ' + Authorization);
+        },
+        success: function(response) {
+          const data = response.data;
+          const groupsContainer = $(".msg_history");
+          groupsContainer.empty();
+
+         
+
+          data.forEach(function(message) {
+            const formattedDate = moment(message.created_at).format("DD-MM-YYYY hh:mm A");
+            const messageElement = $("<div class=''></div>");
+            if (message.user_id._id == userId) {
+              messageElement.append(`
+                                <div class="outgoing_msg">
+                                    <div class= "sent_msg">
+                                        <p>${message.message}</p>
+                                        <span class="time_date">${formattedDate}</span>
+                                    </div>
+                                </div>
+                            `);
+            } else {
+              messageElement.append(`
+                                <div class="incoming_msg">
+                                    <div class="incoming_msg_img">
+                                        <img src="https://ptetutorials.com/images/user-profile.png" alt="username" />
+                                        
+                                    </div>
+                                    <div class="received_msg">
+                                        <div class="received_withd_msg">
+                                          <b>${message.user_id.username}</b>
+                                            <p>${message.message}</p>
+                                            <span class="time_date">${formattedDate}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+            }
+
+            groupsContainer.append(messageElement);
+          });
+        },
+        error: function(error) {
+          console.error("Error fetching messages:", error);
+        },
+      });
+
+
+      socket.on('groupMessage', (message) => {
+        getMessages(message.groupId)
+      });
+    }
+
+    function sendMessage(groupId, messageText) {
+      
+      // Replace with the actual API endpoint for sending messages
+      const sendMessageApiUrl = "/api/chat/sendMessage";
+      
+      // Replace with the actual user ID obtained from the cookie
+      const userDataCookie = '<%- JSON.stringify(user) %>';
+         const userData = JSON.parse(userDataCookie);
+      const userId = userData.id;
+      socket.emit('groupMessage', {groupId, data:{message: messageText, 
+                                    user_id: {_id:userId},created_at:new Date(),
+                                    username: userData.username,
+
+                                    } });
+      
+      // Replace with any additional data required for your API
+      const data = {
+        groupId: groupId,
+        userId: userId,
+        message: messageText,
+      };
+
+      // Make an AJAX request to send the message
+      $.ajax({
+        url: sendMessageApiUrl,
+        type: "POST",
+        data: data,
+        beforeSend: function(xhr) {
+          xhr.setRequestHeader('Authorization', 'Bearer ' + Authorization);
+        },
+        success: function(response) {
+          // Assuming the API returns the newly sent message
+          const sentMessage = response.data;
+
+          // Update the UI with the sent message
+          const groupsContainer = $(".msg_history");
+          const messageElement = $("<div class='outgoing_msg'></div>");
+
+          const formattedDate = moment(sentMessage.created_at).format("DD-MM-YYYY hh:mm A");
+          messageElement.append(`
+                    <div class="sent_msg">
+                        <p>${sentMessage.message}</p>
+                        <span class="time_date">${formattedDate}</span>
+                    </div>
+                `);
+
+          groupsContainer.append(messageElement);
+
+          groupsContainer.scrollTop(groupsContainer[0].scrollHeight);
+        },
+        error: function(error) {
+          console.error("Error sending message:", error);
+        },
+      });
+    }
+
+    function sendMessageHandler() {
+      const groupId = globalGroupId;
+      const messageText = $(".write_msg").val();
+
+      if (messageText.trim() !== "") {
+        sendMessage(groupId, messageText);
+
+        $(".write_msg").val("");
+      }
+    }
+
+ 
+  </script>
+  
+</head>
+
+<body>
+  <!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+    <ul class="navbar-nav">
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+          aria-haspopup="true" aria-expanded="false">
+          <i class="fa fa-user-circle" aria-hidden="true"></i>
+          <span class="navbar-text ml-2" id="loggedInUserName">Username</span>
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="/api/auth/userlogout" >Logout</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+</nav>
+  <div class="container">
+    <h3 class="text-center">Chat</h3>
+    <div class="messaging">
+      <div class="inbox_msg">
+        <div class="inbox_people">
+          <div class="headind_srch">
+            <div class="recent_heading">
+              <h4>Groups</h4>
+            </div>
+          </div>
+          <div class="inbox_chat">  
+        </div>
+        </div>
+        <div class="start_chat" id="startChatId">
+          Select a group to start chatting.
+        </div>
+        <div class="mesgs">
+          <div class="msg_history"></div>
+          <div class="type_msg d-none" id="typeMsgId">
+            <div class="input_msg_write">
+              <input type="text" class="write_msg" placeholder="Type a message" />
+              <button class="msg_send_btn" onclick="sendMessageHandler()" type="button">
+                <i class="fa fa-paper-plane-o" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</body>
+
+</html>
+</head>
+
+</html>
