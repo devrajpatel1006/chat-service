@@ -46,6 +46,11 @@ Chai and Axios are popular choices for E2E testing. Mocha as the test framework.
   npm install mocha chai axios --save-dev
 ```
 
+Run test cases
+```bash
+  npm run test:all
+```
+
 ## Usage
 
 1. Start the server:
